@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="MauiApp.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:MauiApp"
+    Title="Dropbox Tutorial">
+
+    <!-- Shell tạo MainPage; Up/Root duyệt dữ liệu trong trang, không chuyển route Shell. -->
+    <ShellContent
+        Title="Dropbox files"
+        ContentTemplate="{DataTemplate local:MainPage}"
+        Route="MainPage" />
+
+</Shell>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:MauiApp.Models"
+             x:Class="MauiApp.MainPage"
+             Title="Dropbox files">
+
+    <!-- Một vùng cuộn chính; các thao tác điều hướng được xử lý trong code-behind. -->
+    <CollectionView x:Name="FilesCollectionView" SelectionMode="None">
+        <!-- Kết nối, token tạm thời và vị trí thư mục đang xem. -->
+        <CollectionView.Header>
+            <VerticalStackLayout Padding="24" Spacing="16" MaximumWidthRequest="720">
+                <Label Text="Dropbox files"
+                       Style="{StaticResource Headline}"
+                       SemanticProperties.HeadingLevel="Level1" />
+                <Label Text="Test the connection, then browse your accessible Dropbox folders. This developer demo uses a generated token, not OAuth sign-in." />
+                <Label Text="Access token" />
+                <Entry x:Name="AccessTokenEntry"
+                       Placeholder="Paste your access token here"
+                       IsPassword="True"
+                       IsTextPredictionEnabled="False"
+                       IsSpellCheckEnabled="False"
+                       TextChanged="OnAccessTokenChanged"
+                       SemanticProperties.Description="Dropbox access token, hidden input" />
+                <Label Text="Tokens are not saved to disk. Use Clear token when finished. Never include tokens in source code, screenshots or logs."
+                       FontSize="13" />
+                <Button x:Name="TestConnectionButton"
+                        Text="Test connection"
+                        Clicked="OnTestConnectionClicked" />
+                <Button x:Name="LoadFilesButton"
+                        Text="Load files"
+                        Clicked="OnLoadFilesClicked"
+                        SemanticProperties.Hint="Reloads the current folder metadata without downloading file contents" />
+                <Button x:Name="ClearTokenButton"
+                        Text="Clear token"
+                        Clicked="OnClearTokenClicked" />
+                <Label x:Name="StatusLabel"
+                       Text="Not checked. Enter a token, then select Test connection or Load files."
+                       LineBreakMode="WordWrap" />
+                <Label Text="Files and folders"
+                       FontAttributes="Bold"
+                       SemanticProperties.HeadingLevel="Level2" />
+                <Label x:Name="CurrentPathLabel" Text="Current folder: /" LineBreakMode="WordWrap" />
+                <HorizontalStackLayout Spacing="12">
+                    <Button x:Name="ParentFolderButton" Text="Up" IsEnabled="False"
+                            Clicked="OnParentFolderClicked" SemanticProperties.Hint="Opens the parent folder" />
+                    <Button x:Name="RootFolderButton" Text="Root" IsEnabled="False"
+                            Clicked="OnRootFolderClicked" SemanticProperties.Hint="Returns to the accessible root folder" />
+                </HorizontalStackLayout>
+                <Label Text="Open folders to browse. Read text previews .txt UTF-8 files up to 1 MiB in memory (files.content.read required). Load files reloads the current folder. Saving files and uploads are not implemented yet."
+                       FontSize="13" />
+            </VerticalStackLayout>
+        </CollectionView.Header>
+
+        <!-- Folder có nút mở; file .txt có nút đọc nội dung giới hạn trong bộ nhớ. -->
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="models:DropboxItem">
+                <Border Margin="24,4" Padding="12" MaximumWidthRequest="672">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnFolderTapped" CommandParameter="{Binding .}" />
+                    </Border.GestureRecognizers>
+                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="6" ColumnSpacing="12">
+                        <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                        <Label Grid.Column="1" Text="{Binding Kind}" />
+                        <Label Grid.Row="1" Text="{Binding SizeText}" FontSize="13" />
+                        <Button Grid.Row="1" Grid.Column="1" Text="Open folder" IsVisible="{Binding IsFolder}"
+                                CommandParameter="{Binding .}" Clicked="OnOpenFolderClicked" />
+                        <Button Grid.Row="1" Grid.Column="1" Text="Read text" IsVisible="{Binding CanReadText}"
+                                CommandParameter="{Binding .}" Clicked="OnReadTextClicked" />
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
+
+        <!-- Nhãn rỗng ở Footer, không dùng EmptyView để tránh lặp lại nghi vấn chặn chuột. -->
+        <CollectionView.Footer>
+            <VerticalStackLayout Padding="24" Spacing="12" MaximumWidthRequest="720">
+                <Label x:Name="EmptyListLabel"
+                       Text="No files loaded yet."
+                       HorizontalTextAlignment="Center" />
+                <ActivityIndicator x:Name="ConnectionActivityIndicator"
+                                   IsVisible="False" IsRunning="False"
+                                   SemanticProperties.Description="Waiting for Dropbox" />
+                <Label x:Name="ListingStatusLabel" Text="Select Load files to begin." LineBreakMode="WordWrap" />
+                <Button x:Name="LoadMoreButton"
+                        Text="Load more" IsVisible="False" IsEnabled="False"
+                        Clicked="OnLoadMoreClicked" />
+                <VerticalStackLayout x:Name="TextPreviewSection" IsVisible="False" Spacing="8">
+                    <Label x:Name="PreviewTitleLabel" FontAttributes="Bold" LineBreakMode="WordWrap" />
+                    <Label x:Name="PreviewStatusLabel" LineBreakMode="WordWrap" />
+                    <Editor x:Name="PreviewEditor" IsReadOnly="True" AutoSize="Disabled" HeightRequest="280"
+                            SemanticProperties.Description="Plain text preview from Dropbox; not saved to disk" />
+                    <Button Text="Close preview" Clicked="OnClosePreviewClicked" />
+                </VerticalStackLayout>
+                <VerticalStackLayout x:Name="DiagnosticsSection" IsVisible="False" Spacing="8">
+                    <Label Text="Diagnostic details" FontAttributes="Bold" />
+                    <Label Text="Known credentials and the active cursor are redacted. Review these details for private paths or other data before sharing. Debug builds also include stack traces."
+                           FontSize="13" />
+                    <Editor x:Name="DiagnosticsEditor" IsReadOnly="True"
+                            AutoSize="TextChanges" MinimumHeightRequest="160" FontSize="12"
+                            SemanticProperties.Description="Redacted Dropbox error details" />
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </CollectionView.Footer>
+    </CollectionView>
+</ContentPage>
