@@ -5,7 +5,12 @@ Tài liệu làm việc, cập nhật từng bước khi triển khai sample.
 File hiện tại giữ nhật ký chi tiết, lịch sử lỗi và kết quả kiểm tra, không thay thế bản cô đọng.
 Ngày bắt đầu: 18/09/2026.
 
-**Mốc hiện tại — 18/09/2026:** người dùng đã tạo Dropbox app mới và xác nhận
+**Mốc hiện tại — 20/09/2026:** đã triển khai đăng nhập Authorization Code + PKCE cho
+Windows/Android, callback riêng từng nền tảng, SecureStorage và refresh token.
+Build hai nền tảng đạt; 92 kiểm tra OAuth đạt ở Debug/Release. Chưa đăng nhập Dropbox
+thật hoặc thử callback/SecureStorage trên Android thật; cấu hình và checklist ở mục 13.
+
+**Mốc trước OAuth — 18/09/2026:** người dùng đã tạo Dropbox app mới và xác nhận
 kiểm tra kết nối thành công. Bước 2.1 đã được triển khai, build và kiểm tra giả lập;
 người dùng xác nhận Load files hiển thị các folder trên tài khoản thật.
 Bước 2.2 đã được người dùng xác nhận duyệt thư mục thành công.
@@ -62,6 +67,9 @@ từ một ứng dụng .NET MAUI?
 - [x] Triển khai bước 2.3: đọc .txt UTF-8 tối đa 1 MiB, preview văn bản thuần trong bộ nhớ.
 - [x] Build Windows 0 lỗi/0 cảnh báo; 94 kiểm tra preview, 72 liệt kê và 23 diagnostics đạt ở mỗi cấu hình Debug/Release.
 - [ ] Người dùng xác nhận đọc file text thật, bao gồm tiếng Việt và lỗi thiếu quyền đọc nội dung nếu gặp.
+- [x] Bổ sung OAuth PKCE cho Windows/Android; giữ token thủ công làm chế độ đối chiếu API.
+- [x] Build OAuth Windows/Android 0 lỗi/0 cảnh báo; 92 kiểm tra OAuth và 189 kiểm tra hồi quy đạt ở mỗi cấu hình Debug/Release.
+- [ ] Cấu hình redirect URI/App key trong App Console và xác nhận đăng nhập thật trên từng nền tảng.
 - [ ] Hoàn thành phần 2: thao tác với file.
 
 ## 3. Chuẩn bị dự án MAUI — đã thực hiện
@@ -927,9 +935,12 @@ Tài liệu chính thức đã đối chiếu, nếu có:
 | 18/09/2026 | Tạo MAUI_DROPBOX_TUTORIAL.md làm tài liệu chính cho diễn đàn | Hai phần kết nối/thao tác, thành phần sample, nguồn SDK/API/OAuth và lưu ý ngắn |
 | 18/09/2026 | Triển khai bước 2.3: xem .txt UTF-8 trong bộ nhớ | Giới hạn 1 MiB, UI tối đa khoảng 32K ký tự, xử lý lỗi quyền nội dung và giữ trạng thái duyệt |
 | 18/09/2026 | Build và kiểm tra sau bước 2.3 | 0 lỗi/0 cảnh báo; 94 preview + 72 liệt kê + 23 diagnostics đạt ở mỗi cấu hình Debug/Release; chưa thử UI text thật |
+| 20/09/2026 | Người dùng yêu cầu giải pháp đăng nhập hoạt động thay cho sửa sample implicit của khách | Chuyển sang Authorization Code + PKCE, không tái hiện lỗi HTML cũ |
+| 20/09/2026 | Triển khai OAuth, callback Windows/Android, SecureStorage, refresh và hủy | App key nhập trên UI; không App secret, không index.html, Android không chạy loopback listener |
+| 20/09/2026 | Kiểm tra bản OAuth | Windows/Android build 0 lỗi/0 cảnh báo; 92 OAuth + 94 preview + 72 liệt kê + 23 diagnostics đạt ở mỗi cấu hình; chưa dùng tài khoản thật |
 
-**Bước tiếp theo:** chạy bản mới và xác nhận **2.3 — đọc file .txt** theo mục 2.3.4;
-sau đó triển khai **2.4 — lưu file xuống thiết bị**.
+**Bước tiếp theo:** cấu hình App Console và xác nhận **OAuth thật** theo mục 13,
+rồi thử lại duyệt/đọc .txt. Chưa triển khai **2.4 — lưu file xuống thiết bị**.
 Load more và các ca UI phụ chưa được người dùng xác nhận vẫn để mở.
 Vấn đề app cũ vẫn tạm hoãn.
 
@@ -1051,7 +1062,7 @@ Không kết luận một trang chính thức chỉ vì nằm trên GitHub/GitHu
 
 ### 9.3 — OAuth Guide: phân biệt demo với đăng nhập thực tế
 
-- Bản hiện tại nhận access token nhập thủ công; không thực hiện đăng nhập OAuth.
+- Bản ngày 18/09 chỉ nhận token thủ công; bản ngày 20/09 đã thêm OAuth PKCE Windows/Android (mục 13).
 - Guide giúp giải thích vì sao scopes quyết định thao tác được phép, thay vì
   hiểu **Full Dropbox** là tự động có mọi quyền đọc/ghi.
 - Khi triển khai đăng nhập cho khách, tham khảo phần PKCE trong guide và ví dụ
@@ -1059,8 +1070,8 @@ Không kết luận một trang chính thức chỉ vì nằm trên GitHub/GitHu
   phải được kiểm tra riêng trên từng nền tảng.
 - Refresh token là phần mở rộng để duy trì truy cập bằng access token ngắn hạn;
   không coi token tạo thủ công là giải pháp đăng nhập lâu dài.
-- Không nhúng App secret vào ứng dụng native. Bước OAuth chưa được triển khai
-  hoặc kiểm thử trong sample này; không đánh dấu hoàn thành dựa trên việc đọc guide.
+- Không nhúng App secret vào ứng dụng native. OAuth đã build/kiểm tra giả lập,
+  nhưng chưa đánh dấu đăng nhập tài khoản thật thành công chỉ dựa trên các kiểm tra này.
 
 ### 9.4 — API Explorer: phép thử đối chiếu tùy chọn
 
@@ -1375,3 +1386,138 @@ khi hướng dẫn tiếp; không lặp lại yêu cầu bấm một nút mà ng
 
 Lượt này chỉ cập nhật tài liệu và chẩn đoán, không đổi request hoặc mã nguồn,
 không chạy lại build và chưa có kết quả thử với token mới.
+
+## 13. OAuth PKCE — giải pháp mới cho Windows và Android (20/09/2026)
+
+### 13.1 — Mục tiêu và thay đổi so với sample của khách
+
+Khách cần app mở trình duyệt, cho phép người dùng đăng nhập/cấp quyền rồi tự nhận token.
+Theo yêu cầu, không dành bước này tái hiện/sửa sample implicit có HTML/JS trung gian.
+Bản mới dùng Authorization Code + PKCE S256, không cần Generate access token thủ công.
+
+```text
+Connect Dropbox
+  -> tạo state + verifier ngẫu nhiên, mở browser với code_challenge
+  -> Dropbox chuyển authorization code về callback của nền tảng
+  -> kiểm tra endpoint/state rồi POST code + verifier qua HTTPS
+  -> lưu phiên vào SecureStorage
+  -> tự tải thư mục gốc bằng Dropbox.Api
+```
+
+- Windows: TcpListener tạm thời chỉ bind IPv4 127.0.0.1; không dùng HttpListener/URL ACL.
+- Android: callback activity nhận custom URI; không dùng localhost, không cần đổi IP emulator.
+- Không có index.html, token fragment hoặc JavaScript chuyển token qua query string.
+- Chỉ hỗ trợ OAuth Windows/Android trong sample. Apple targets chưa cấu hình callback,
+  vẫn có chế độ token thủ công; không đánh dấu hỗ trợ OAuth Apple.
+
+### 13.2 — Các file và trách nhiệm
+
+| File trong `MauiApp` | Trách nhiệm |
+| --- | --- |
+| `Services/Authentication/DropboxOAuthOptions.cs` | Redirect URI, scopes, timeout và tên khóa lưu trữ |
+| `Services/Authentication/DropboxOAuthAttempt.cs` | State/verifier mới mỗi lần, S256, tạo authorize URL, kiểm tra callback/query |
+| `Services/Authentication/DropboxOAuthProtocol.cs` | POST đổi code/refresh token; giới hạn response và che lỗi có dữ liệu nhạy cảm |
+| `Services/Authentication/DropboxOAuthTokens.cs` | Phiên access/refresh token, App key, thời điểm hết hạn; không tự in token qua ToString |
+| `Services/Authentication/DropboxOAuthJsonContext.cs` | Source-generated JSON cho phiên OAuth, tránh phụ thuộc reflection khi trim Android |
+| `Services/Authentication/DropboxAuthService.cs` | Restore, sign-in/out, refresh trước hạn 1 phút; serialize thao tác bằng semaphore |
+| `Services/Authentication/IDropboxOAuthBrowser.cs` | Abstraction browser/store để kiểm tra bằng dữ liệu giả |
+| `Services/Authentication/MauiDropboxOAuth.cs` | Adapter browser trên UI thread và MAUI SecureStorage |
+| `Services/Authentication/LoopbackOAuthReceiver.cs` | Nhận callback Windows, phản hồi mọi request, giải phóng port khi xong/hủy |
+| `Services/Authentication/OAuthCallbackRouter.cs` | Ghép callback Android vào đúng lần đăng nhập, bỏ callback sai/lặp/đến muộn |
+| `Services/Authentication/DropboxAuthenticationException.cs` | Thông báo OAuth an toàn, không giữ raw exception/token response |
+| `Platforms/Android/DropboxCallbackActivity.cs` | IntentFilter đúng scheme/host/path, kiểm tra callback rồi đưa MainActivity lên trước |
+| `MainPage.xaml` / `.xaml.cs` | App key, Connect/Cancel/Disconnect, restore và tự chọn nguồn token cho các request file |
+
+Phần OAuth gọi trực tiếp hai endpoint chính thức bằng HttpClient để kiểm soát hủy và lỗi;
+không thêm package. Phần thao tác file vẫn dùng Dropbox.Api 7.3.0 như trước.
+
+### 13.3 — Cấu hình phía Dropbox (người dùng thực hiện)
+
+1. Mở app của bạn trong Dropbox App Console. Không cần xóa hoặc tạo lại app đang dùng.
+2. Bật `files.metadata.read` và `files.content.read`, bấm Submit. Chưa cần quyền ghi/upload.
+3. Trong Settings → OAuth 2 → Redirect URIs, đăng ký chính xác:
+
+```text
+http://127.0.0.1:52475/authorize
+mauidropboxtutorial://oauth/callback
+```
+
+4. Không thêm dấu `/` cuối. Nếu đổi constant Windows port hoặc Android scheme/host/path,
+   phải sửa App Console; với Android còn phải sửa IntentFilter tương ứng.
+5. Lấy **App key**, không phải App secret; nhập App key trên UI. Không gửi token/secret cho người hỗ trợ.
+6. Không cần bấm Generate access token cho bản OAuth. Khi thay scope, Disconnect/Connect lại.
+
+### 13.4 — Chạy bản mới
+
+**Windows:** đóng app cũ, chạy từ thư mục gốc repo:
+
+```powershell
+dotnet run --project MauiApp/MauiApp.csproj -f net10.0-windows10.0.19041.0 -p:TargetFrameworks=net10.0-windows10.0.19041.0
+```
+
+**Android:** mở emulator hoặc kết nối thiết bị, chọn Android target trong VS Code MAUI
+rồi F5. App cần browser xử lý HTTPS. Manifest đã khai báo callback activity được export,
+intent filter và package visibility cho browser. Không cần mở một server Windows riêng.
+
+Thao tác:
+1. Nhập App key → Connect Dropbox → đăng nhập/cấp quyền trong browser.
+2. Windows thông báo quay lại app; Android đưa app lên trước sau callback hợp lệ.
+3. Phiên được lưu, danh sách gốc tự tải. Thử Open folder/Up/Root/Read text như trước.
+4. Khởi động lại app: App key được đọc từ Preferences, phiên từ SecureStorage.
+   App không tự mở browser; chọn Load files, token gần hết hạn sẽ được refresh.
+5. Disconnect / Clear token xóa phiên cục bộ và dữ liệu trang, không thu hồi quyền app
+   trên Dropbox và không xóa phiên đăng nhập của browser. Muốn đổi tài khoản có thể cần
+   đăng xuất Dropbox trong browser rồi Connect lại.
+
+Token thủ công vẫn là chế độ phụ: nhập vào ô Optional khi chưa có phiên OAuth.
+Ô này bị khóa trong phiên OAuth, không ghi token thủ công xuống đĩa và không tự refresh.
+
+### 13.5 — Vòng đời, lỗi và giới hạn
+
+- Toàn bộ sign-in tối đa 3 phút; nút Cancel nằm ngoài CollectionView đang bị khóa.
+  Đóng browser không tự gửi callback hủy: quay lại app để bấm Cancel hoặc chờ timeout.
+- State/verifier sinh từ bộ tạo số ngẫu nhiên mật mã. Callback phải đúng endpoint/state,
+  không có fragment; query trùng tham số bị từ chối. State sai không kết thúc phiên đúng.
+- Windows bắt đầu listen trước khi mở browser; header request giới hạn 8 KiB, mỗi kết nối
+  chờ tối đa 5 giây. Phản hồi không echo code/state, có no-store, no-referrer và CSP.
+  Port bận báo rõ; không kill tiến trình khác hoặc tự đổi port lệch với App Console.
+- Token exchange luôn dùng HTTPS và không tự theo redirect. Response mặc định giới hạn 64 KiB,
+  timeout HTTP 30 giây. Không gửi client_secret, không in nguyên token response/exception.
+- Refresh trước khi hết hạn 1 phút. Các yêu cầu refresh được tuần tự hóa. Lỗi mạng/tạm thời
+  giữ phiên để retry; invalid_grant/invalid_client xóa phiên và yêu cầu đăng nhập lại.
+- Nếu API file từ chối token sớm, thao tác kế tiếp sẽ thử refresh. Không tự lặp API vô hạn.
+- SecureStorage lỗi đọc/lưu/xóa có thông báo riêng; không giả vờ đã lưu hoặc xóa thành công.
+- Android sample đặt allowBackup=false. Nếu OS hủy process trong lúc browser đăng nhập,
+  callback cũ không có phiên đang chờ sẽ bị bỏ qua: mở app và Connect lại. Không persist verifier/state.
+- Custom scheme này dành cho sample; khi phát hành dùng scheme riêng hoặc đánh giá verified app links.
+- Không log access/refresh token, authorization code, verifier, state hoặc toàn bộ callback URL.
+
+### 13.6 — Kiểm tra đã thực hiện và việc còn chờ
+
+- Windows build: **0 lỗi, 0 cảnh báo** (output `MauiApp/bin/oauth-check/windows`).
+- Android build: **0 lỗi, 0 cảnh báo** (output `MauiApp/bin/oauth-check/android`).
+  Đã kiểm tra manifest sinh ra chứa activity exported và đúng scheme/host/path.
+- **92 kiểm tra OAuth đạt ở mỗi cấu hình Debug/Release**: vector S256 RFC 7636, state/verifier
+  độc lập, callback sai/trùng/đến muộn, deny/cancel, token exchange, refresh, storage giả,
+  concurrency, revoked session và lỗi không lộ bí mật.
+- Riêng Windows có kiểm tra **socket HTTP loopback thật trên máy**, gồm request sai,
+  callback hợp lệ, phản hồi không echo code, hủy và đăng nhập liên tiếp không giữ port.
+- Hồi quy mỗi cấu hình: **94 text preview + 72 liệt kê + 23 diagnostics** đều đạt.
+- Các token/HTTP/storage/browser đều giả, trừ socket loopback nội bộ. Chưa gửi OAuth tới
+  Dropbox bằng App key thật, chưa kiểm tra SecureStorage thực tế trên thiết bị.
+- Không có Android device/emulator kết nối tại thời điểm kiểm tra; không coi Android build
+  thành công là đã kiểm chứng callback UI trên emulator.
+- Mã kiểm tra tạm ở `MauiApp/obj/oauth-smoke/OAuthSmoke.cs` và các smoke cũ; có thể mất sau clean,
+  không phải test project được quản lý trong repo. Không commit/push trong lượt triển khai này.
+
+| Ca người dùng cần xác nhận | Kết quả mong đợi | Trạng thái |
+| --- | --- | --- |
+| Windows Connect bằng App key thật | Consent → callback → danh sách gốc | Chờ thử thật |
+| Android Connect bằng App key thật | Browser → callback activity → app → danh sách | Chờ thử emulator/thiết bị |
+| Từ chối hoặc Cancel, rồi Connect lại | Không treo, không lưu phiên mới, có thể thử lại | Chờ thử UI |
+| Đóng/mở app | Khôi phục phiên, không phải Generate token | Chờ thử SecureStorage thật |
+| Token hết hạn hoặc bị thu hồi | Refresh hoặc yêu cầu Connect lại, không vòng lặp vô hạn | Chờ thử thật |
+| Duyệt/đọc text sau OAuth | Giữ nguyên chức năng metadata/preview | Chờ thử thật |
+
+Bản hướng dẫn cô đọng ở MAUI_DROPBOX_TUTORIAL.md đã chuyển OAuth thành luồng chính.
+Các đoạn mô tả token thủ công trong mục cũ là lịch sử ngày 18/09, không phải giới hạn của bản mới.

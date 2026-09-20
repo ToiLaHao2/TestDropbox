@@ -5,16 +5,26 @@
              x:Class="MauiApp.MainPage"
              Title="Dropbox files">
 
-    <!-- Một vùng cuộn chính; các thao tác điều hướng được xử lý trong code-behind. -->
-    <CollectionView x:Name="FilesCollectionView" SelectionMode="None">
+    <Grid RowDefinitions="Auto,*">
+    <!-- Nút hủy nằm ngoài vùng bị khóa trong khi đợi OAuth. -->
+    <Button x:Name="CancelSignInButton" Text="Cancel sign-in" IsVisible="False"
+            Margin="24,8" Clicked="OnCancelSignInClicked" />
+    <CollectionView x:Name="FilesCollectionView" Grid.Row="1" SelectionMode="None">
         <!-- Kết nối, token tạm thời và vị trí thư mục đang xem. -->
         <CollectionView.Header>
             <VerticalStackLayout Padding="24" Spacing="16" MaximumWidthRequest="720">
                 <Label Text="Dropbox files"
                        Style="{StaticResource Headline}"
                        SemanticProperties.HeadingLevel="Level1" />
-                <Label Text="Test the connection, then browse your accessible Dropbox folders. This developer demo uses a generated token, not OAuth sign-in." />
-                <Label Text="Access token" />
+                <Label Text="Connect Dropbox using your App key and the system browser. OAuth PKCE is configured for Windows and Android; no App secret or manually generated token is needed." />
+                <Label Text="Dropbox App key (not App secret)" />
+                <Entry x:Name="AppKeyEntry" Placeholder="App key from Dropbox App Console"
+                       IsTextPredictionEnabled="False" IsSpellCheckEnabled="False" />
+                <Button x:Name="ConnectDropboxButton" Text="Connect Dropbox" Clicked="OnConnectDropboxClicked" />
+                <Label x:Name="AuthStatusLabel" Text="Not signed in." LineBreakMode="WordWrap" />
+                <Label Text="OAuth sessions are saved in SecureStorage and refreshed automatically. Disconnect clears this app's saved session, not Dropbox's browser login or authorization."
+                       FontSize="13" />
+                <Label Text="Optional: manual access token for developer testing" />
                 <Entry x:Name="AccessTokenEntry"
                        Placeholder="Paste your access token here"
                        IsPassword="True"
@@ -22,7 +32,7 @@
                        IsSpellCheckEnabled="False"
                        TextChanged="OnAccessTokenChanged"
                        SemanticProperties.Description="Dropbox access token, hidden input" />
-                <Label Text="Tokens are not saved to disk. Use Clear token when finished. Never include tokens in source code, screenshots or logs."
+                <Label Text="Manual tokens stay in memory and are disabled while signed in with OAuth. Never include tokens, authorization codes or callback URLs in source code, screenshots or logs."
                        FontSize="13" />
                 <Button x:Name="TestConnectionButton"
                         Text="Test connection"
@@ -32,10 +42,10 @@
                         Clicked="OnLoadFilesClicked"
                         SemanticProperties.Hint="Reloads the current folder metadata without downloading file contents" />
                 <Button x:Name="ClearTokenButton"
-                        Text="Clear token"
+                        Text="Disconnect / Clear token"
                         Clicked="OnClearTokenClicked" />
                 <Label x:Name="StatusLabel"
-                       Text="Not checked. Enter a token, then select Test connection or Load files."
+                       Text="Enter your App key and select Connect Dropbox, or use a manual token for testing."
                        LineBreakMode="WordWrap" />
                 <Label Text="Files and folders"
                        FontAttributes="Bold"
@@ -103,4 +113,5 @@
             </VerticalStackLayout>
         </CollectionView.Footer>
     </CollectionView>
+    </Grid>
 </ContentPage>

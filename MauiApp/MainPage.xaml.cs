@@ -4,6 +4,7 @@ using Dropbox.Api;
 using Dropbox.Api.Files;
 using MauiApp.Models;
 using MauiApp.Services;
+using MauiApp.Services.Authentication;
 
 namespace MauiApp;
 
@@ -11,6 +12,9 @@ namespace MauiApp;
 public partial class MainPage : ContentPage
 {
 	private readonly DropboxService dropboxService = new();
+	private readonly DropboxAuthService authentication = MauiDropboxOAuth.CreateService();
+	private CancellationTokenSource? signInCancellation;
+	private bool restoreAttempted;
 	private readonly ObservableCollection<DropboxItem> items = new();
 	// Id -> vị trí trong collection, giúp cập nhật mục đã có thay vì thêm bản sao khi nối trang.
 	private readonly Dictionary<string, int> itemIndexes = new(StringComparer.Ordinal);
@@ -25,6 +29,85 @@ public partial class MainPage : ContentPage
 		InitializeComponent();
 		items.CollectionChanged += (sender, eventArgs) => EmptyListLabel.IsVisible = items.Count == 0;
 		FilesCollectionView.ItemsSource = items;
+		AppKeyEntry.Text = Preferences.Default.Get(DropboxOAuthOptions.AppKeyPreference, string.Empty);
+	}
+
+	protected override async void OnAppearing()
+	{
+		base.OnAppearing();
+		if (restoreAttempted || isBusy) { return; }
+		restoreAttempted = true;
+		SetBusy(true);
+		try
+		{
+			await authentication.RestoreAsync(AppKeyEntry.Text?.Trim() ?? string.Empty);
+			if (authentication.HasSession) { StatusLabel.Text = "Saved OAuth session restored. Select Load files."; }
+		}
+		catch (Exception exception) { ShowSignInFailure(exception); }
+		finally { SetBusy(false); }
+	}
+
+	private async void OnConnectDropboxClicked(object? sender, EventArgs eventArgs)
+	{
+		if (isBusy) { return; }
+		ClearDiagnostics();
+		ResetBrowser();
+		using var cancellation = new CancellationTokenSource();
+		signInCancellation = cancellation;
+		SetBusy(true);
+		AccessTokenEntry.Text = string.Empty;
+		CancelSignInButton.IsVisible = true;
+		CancelSignInButton.IsEnabled = true;
+		var connected = false;
+		try
+		{
+			var appKey = AppKeyEntry.Text?.Trim() ?? string.Empty;
+			DropboxOAuthAttempt.ValidateAppKey(appKey);
+			Preferences.Default.Set(DropboxOAuthOptions.AppKeyPreference, appKey);
+			StatusLabel.Text = "Complete Dropbox sign-in in the browser, then return here. Cancel or wait up to 3 minutes.";
+			await authentication.SignInAsync(appKey, cancellation.Token);
+			connected = true;
+			StatusLabel.Text = "Signed in. Loading your Dropbox root...";
+		}
+		catch (Exception exception) { ShowSignInFailure(exception); }
+		finally
+		{
+			signInCancellation = null;
+			CancelSignInButton.IsVisible = false;
+			SetBusy(false);
+		}
+		if (connected) { await LoadPageAsync(false, string.Empty); }
+	}
+
+	private void OnCancelSignInClicked(object? sender, EventArgs eventArgs)
+	{
+		signInCancellation?.Cancel();
+		CancelSignInButton.IsEnabled = false;
+	}
+
+	// Không hiển thị exception thô của trình duyệt/token endpoint vì có thể chứa bí mật.
+	private void ShowSignInFailure(Exception exception)
+	{
+		StatusLabel.Text = exception switch
+		{
+			DropboxAuthenticationException failure => failure.Message,
+			OperationCanceledException => "Sign-in canceled or timed out. Return to the app and select Connect Dropbox to retry.",
+			_ => "Sign-in could not be completed. Check the browser, App Console callback settings and secure storage, then retry."
+		};
+	}
+
+	private async Task<string> GetRequestAccessTokenAsync()
+	{
+		if (authentication.HasSession)
+		{
+			return await authentication.GetAccessTokenAsync(AppKeyEntry.Text?.Trim() ?? string.Empty);
+		}
+		var token = AccessTokenEntry.Text?.Trim();
+		if (string.IsNullOrWhiteSpace(token))
+		{
+			throw new DropboxAuthenticationException("Connect Dropbox, or enter a manual token for testing. No file request was sent.");
+		}
+		return token;
 	}
 
 	// Kiểm tra đọc ở gốc mà không đổi thư mục hoặc danh sách đang xem.
@@ -36,17 +119,13 @@ public partial class MainPage : ContentPage
 		}
 
 		ClearDiagnostics();
-		var accessToken = AccessTokenEntry.Text?.Trim();
-		if (string.IsNullOrWhiteSpace(accessToken))
-		{
-			StatusLabel.Text = "Please enter an access token. No request was sent.";
-			return;
-		}
+		var accessToken = string.Empty;
 
 		SetBusy(true);
 		StatusLabel.Text = "Checking Dropbox read access...";
 		try
 		{
+			accessToken = await GetRequestAccessTokenAsync();
 			await dropboxService.TestConnectionAsync(accessToken);
 			StatusLabel.Text = "Connected successfully. Dropbox accepted the token and the root folder metadata request. No file contents were downloaded or changed.";
 		}
@@ -126,17 +205,13 @@ public partial class MainPage : ContentPage
 			StatusLabel.Text = "Only .txt UTF-8 files can be previewed. Other formats are not supported yet.";
 			return;
 		}
-		var accessToken = AccessTokenEntry.Text?.Trim();
-		if (string.IsNullOrWhiteSpace(accessToken))
-		{
-			StatusLabel.Text = "Please enter an access token. No request was sent.";
-			return;
-		}
+		var accessToken = string.Empty;
 
 		SetBusy(true);
 		StatusLabel.Text = "Reading text into memory (maximum 1 MiB)...";
 		try
 		{
+			accessToken = await GetRequestAccessTokenAsync();
 			var preview = await dropboxService.ReadTextFileAsync(accessToken, file);
 			const int maxDisplayedCharacters = 32_768;
 			var displayLength = Math.Min(preview.Content.Length, maxDisplayedCharacters);
@@ -209,13 +284,7 @@ public partial class MainPage : ContentPage
 		}
 
 		ClearDiagnostics();
-		var accessToken = AccessTokenEntry.Text?.Trim();
-		if (string.IsNullOrWhiteSpace(accessToken))
-		{
-			StatusLabel.Text = "Please enter an access token. No request was sent.";
-			ListingStatusLabel.Text = StatusLabel.Text;
-			return;
-		}
+		var accessToken = string.Empty;
 
 		// Chụp tham số request; chỉ chốt trạng thái điều hướng mới khi nhận kết quả thành công.
 		var requestedCursor = append ? nextCursor : null;
@@ -232,6 +301,7 @@ public partial class MainPage : ContentPage
 		ListingStatusLabel.Text = StatusLabel.Text;
 		try
 		{
+			accessToken = await GetRequestAccessTokenAsync();
 			var page = await dropboxService.ListFilesAsync(accessToken, requestedCursor, requestedPath);
 			// Không xóa dữ liệu trước await: lỗi mở folder phải giữ path và danh sách cũ nhất quán.
 			if (!append)
@@ -282,18 +352,25 @@ public partial class MainPage : ContentPage
 		}
 	}
 
-	// Xóa token khỏi ô nhập và trạng thái trang; không thu hồi token ở Dropbox.
-	private void OnClearTokenClicked(object? sender, EventArgs eventArgs)
+	// Xóa phiên SecureStorage và dữ liệu trên trang; không thu hồi quyền trên Dropbox.
+	private async void OnClearTokenClicked(object? sender, EventArgs eventArgs)
 	{
 		if (isBusy)
 		{
 			return;
 		}
 
-		AccessTokenEntry.Text = string.Empty;
-		ClearDiagnostics();
-		ResetBrowser();
-		StatusLabel.Text = "Token and list cleared from this page. No active Dropbox client is retained.";
+		SetBusy(true);
+		try
+		{
+			AccessTokenEntry.Text = string.Empty;
+			ClearDiagnostics();
+			ResetBrowser();
+			await authentication.SignOutAsync();
+			StatusLabel.Text = "Local session, manual token and list cleared. Dropbox browser login and app authorization were not revoked.";
+		}
+		catch (Exception exception) { ShowSignInFailure(exception); }
+		finally { SetBusy(false); }
 	}
 
 	// Đổi token bỏ dữ liệu tài khoản cũ; TextChanged cũng có thể chạy khi XAML đang khởi tạo.
@@ -310,7 +387,18 @@ public partial class MainPage : ContentPage
 	// Hiện thông báo dễ đọc và chẩn đoán đã che token/cursor, không hiển thị exception thô.
 	private void ShowFailure(Exception exception, string accessToken, string operation, string? cursor = null)
 	{
-		StatusLabel.Text = GetFailureMessage(exception);
+		if (authentication.HasSession && exception is AuthException authException &&
+			(authException.ErrorResponse?.IsExpiredAccessToken == true || authException.ErrorResponse?.IsInvalidAccessToken == true))
+		{
+			authentication.MarkAccessTokenExpired();
+			StatusLabel.Text = "Dropbox rejected the access token. Retry the action to refresh it, or Disconnect and connect again.";
+		}
+		else { StatusLabel.Text = GetFailureMessage(exception); }
+		if (exception is DropboxAuthenticationException)
+		{
+			operation = "/oauth2/token";
+			if (!authentication.HasSession) { ResetBrowser(); }
+		}
 		DiagnosticsEditor.Text = DropboxDiagnostics.Create(exception, accessToken, operation, cursor);
 		DiagnosticsSection.IsVisible = true;
 	}
@@ -318,6 +406,7 @@ public partial class MainPage : ContentPage
 	// Ánh xạ lỗi SDK/mạng sang gợi ý; xem chi tiết kỹ thuật trong Diagnostic details.
 	private static string GetFailureMessage(Exception exception) => exception switch
 	{
+		DropboxAuthenticationException failure => failure.Message,
 		_ when DropboxDiagnostics.GetMissingScope(exception) is string scope =>
 			$"The Dropbox app or token lacks {scope}. Enable this scope in the issuing app's Permissions, Submit, then obtain a token or authorization with that scope. Existing tokens do not gain new scopes automatically.",
 		AuthException authException when authException.ErrorResponse?.IsExpiredAccessToken == true =>
@@ -384,7 +473,10 @@ public partial class MainPage : ContentPage
 		FilesCollectionView.IsEnabled = !busy;
 		ParentFolderButton.IsEnabled = !busy && currentFolderPath.Length > 0;
 		RootFolderButton.IsEnabled = !busy && currentFolderPath.Length > 0;
-		AccessTokenEntry.IsEnabled = !busy;
+		AccessTokenEntry.IsEnabled = !busy && !authentication.HasSession;
+		AppKeyEntry.IsEnabled = !busy && !authentication.HasSession;
+		ConnectDropboxButton.IsEnabled = !busy && !authentication.HasSession;
+		AuthStatusLabel.Text = authentication.HasSession ? "Signed in with OAuth. Session saved securely; tokens refresh automatically." : "Not signed in with OAuth.";
 		TestConnectionButton.IsEnabled = !busy;
 		ClearTokenButton.IsEnabled = !busy;
 		LoadFilesButton.IsEnabled = !busy;

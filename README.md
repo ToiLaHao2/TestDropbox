@@ -7,8 +7,10 @@ available in the project.
 ## Dropbox tutorial
 
 The page uses `Dropbox.Api` 7.3.0 for a read-only connection check and paginated
-file/folder listing with folder navigation. Enter a generated token, select
-**Load files**, then click a folder or **Open folder** to browse inside.
+file/folder listing with folder navigation. Enter your Dropbox **App key** and select
+**Connect Dropbox** for Authorization Code + PKCE sign-in in the system browser.
+No App secret or manually generated access token is required. After sign-in the root
+loads automatically; click a folder or **Open folder** to browse inside.
 **Up** opens the parent, **Root** returns to the accessible root, and **Load files**
 reloads the current folder. **Load more** appends its next page if available.
 Failed navigation keeps the previous folder and list; clearing/changing the token
@@ -17,7 +19,27 @@ resets the browser to root. **Test connection** remains a root metadata check.
 up to 32K characters displayed below the file list. This requires `files.content.read`.
 No files are saved to disk; saving, import and upload remain unimplemented.
 Do not put tokens or file contents in source code, terminal commands or logs.
-The sample does not persist the token or implement OAuth sign-in.
+OAuth sessions are stored in MAUI SecureStorage; expiring access tokens refresh automatically.
+**Cancel sign-in** stops the current attempt (also limited to 3 minutes).
+**Disconnect / Clear token** clears the local session, not Dropbox's browser login or authorization.
+The optional manual-token field remains available for API-only testing and is not persisted.
+
+### Configure OAuth first
+
+In Dropbox App Console, enable and Submit `files.metadata.read` and `files.content.read`.
+Register these exact redirect URIs under Settings / OAuth 2:
+
+```text
+http://127.0.0.1:52475/authorize
+mauidropboxtutorial://oauth/callback
+```
+
+Windows uses a temporary IPv4 loopback listener bound only to `127.0.0.1`; Android uses
+a callback activity, not an emulator HTTP listener. There is no index.html/JavaScript bridge.
+Closing the browser tab alone does not cancel sign-in; return to the app and press Cancel.
+Use the App key, **not** App secret, in the UI. Callback constants are in
+`MauiApp/Services/Authentication/DropboxOAuthOptions.cs`. OAuth is configured only for
+Windows and Android; Apple targets retain manual-token mode until callbacks are added.
 
 Start with `MAUI_DROPBOX_TUTORIAL.md`, the concise Vietnamese guide for forum replies:
 setup, connection, components, file operations, API sources and caveats.
@@ -29,7 +51,11 @@ and the user confirmed real folders are listed. Step 2.2 navigation is implement
 and the user confirmed folder browsing succeeds. Step 2.3 text preview is implemented
 and builds with zero warnings/errors. In each of Debug and Release, 94 preview checks,
 72 listing checks and 23 diagnostics checks pass using synthetic data/fake HTTP.
-Real UI text preview and the remaining listing edge cases still need user verification.
+On September 20, OAuth was added: Windows and Android builds succeed with zero warnings/errors,
+and 92 OAuth checks pass in each of Debug and Release, including real loopback socket callbacks
+with fake authorization codes. Token exchange, refresh, browser and storage tests use fakes.
+Real Dropbox OAuth consent, device SecureStorage, Android callback UI and text preview still
+need user verification; no live credentials were used and no Android device was connected.
 The tutorial keeps unverified test cases and file operations explicitly pending.
 The page shows redacted diagnostic details, including exception messages, HTTP status
 and Dropbox request IDs when available. Debug builds also log redacted details.
@@ -64,6 +90,8 @@ not needed for the initial build. The first restore requires access to NuGet.
 - `MauiApp/MainPage.xaml`: initial page UI.
 - `MauiApp/MainPage.xaml.cs`: page event handlers.
 - `MauiApp/Services/DropboxService.cs`: connection check and paginated metadata listing.
+- `MauiApp/Services/Authentication/`: PKCE, callback receivers, secure sessions and refresh.
+- `MauiApp/Platforms/Android/DropboxCallbackActivity.cs`: registered OAuth deep-link activity.
 - `MauiApp/Models/DropboxItem.cs`: file/folder display data.
 - `MauiApp/Models/DropboxPage.cs`: one page and its next cursor.
 - `MauiApp/Models/DropboxTextPreview.cs`: decoded text held in memory, not a saved file.
